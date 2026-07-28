@@ -1,0 +1,33 @@
+# Optimized Dual-Branch CFANet Requirements
+# 优化版双分支CFANet依赖包
+
+# Core dependencies
+torch>=1.9.0
+torchvision>=0.10.0
+numpy>=1.21.0
+
+# For optimized Mamba implementation
+einops>=0.6.0 # tensor操作库，用于高效的维度重排
+timm>=0.6.0 # 用于ViT预训练权重 (可选)
+
+# Image processing
+opencv-python>=4.5.0
+Pillow>=8.3.0
+
+# Data handling
+matplotlib>=3.4.0
+scikit-image>=0.18.0
+
+# Training utilities
+tensorboard>=2.7.0 # 训练日志
+tqdm>=4.62.0 # 进度条
+
+# Configuration
+pyyaml>=5.4.0 # YAML配置文件解析
+
+# Evaluation metrics
+scikit-learn>=1.0.0 # 评估指标计算
+
+# Optional: Advanced features
+# transformers>=4.20.0 # Hugging Face transformers (如需更多ViT模型)
+# wandb>=0.12.0 # 实验跟踪 (可选)
