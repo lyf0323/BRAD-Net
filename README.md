@@ -1,5 +1,4 @@
 # BRAD-Net
-# BRAD-Net
 
 **BRAD-Net** is a medical image segmentation network designed for polyp segmentation and related tasks.
 
