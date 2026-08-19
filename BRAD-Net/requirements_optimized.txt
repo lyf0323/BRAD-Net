@@ -1,0 +1,32 @@
+
+
+# Core dependencies
+torch>=1.9.0
+torchvision>=0.10.0
+numpy>=1.21.0
+
+# For optimized Mamba implementation
+einops>=0.6.0 # tensor ops for efficient dimension rearrangement
+timm>=0.6.0 # ViT pretrained weights (optional)
+
+# Image processing
+opencv-python>=4.5.0
+Pillow>=8.3.0
+
+# Data handling
+matplotlib>=3.4.0
+scikit-image>=0.18.0
+
+# Training utilities
+tensorboard>=2.7.0 # training logs
+tqdm>=4.62.0 # progress bar
+
+# Configuration
+pyyaml>=5.4.0 # YAML config parsing
+
+# Evaluation metrics
+scikit-learn>=1.0.0 # metric computation
+
+# Optional: Advanced features
+# transformers>=4.20.0 # Hugging Face transformers (if more ViT models are needed)
+# wandb>=0.12.0 # experiment tracking (optional)
