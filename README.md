@@ -38,8 +38,7 @@ Input Image (352 x 352)
         Adaptive Multi-Level Feature Fusion                         │
                        │                                            │
                        ▼                                            │
-        Boundary-Region Decoupling Decoder                          │
-       (Query Aggregation + Contrastive Loss)                       │
+        Boundary-Region Decoupling Decoder                          │                      
                        │                                            │
                        ▼                                            │
         Predicted Polyp Mask & Boundary Map  ◄──────────────────────┘
