@@ -1,76 +1,94 @@
-# BRAD-Net
+```markdown
+# BRAD-Net: Boundary-Region Adaptive Decoupling Network for Polyp Segmentation
 
-**Boundary-aware dual-encoder network for polyp segmentation**
+Official implementation of **BRAD-Net** for colonoscopy polyp segmentation in medical image analysis.
+
+---
 
 ## Table of Contents
-
-- [1. Title & Description](#1-title--description)
-- [2. Dataset & Code Information](#2-dataset--code-information)
-- [3. Requirements](#3-requirements)
-- [4. Usage Instructions / Steps for Implementation](#4-usage-instructions--steps-for-implementation)
-- [5. Citations](#5-citations)
-- [6. License](#6-license)
-
----
-
-## 1. Title & Description
-
-**BRAD-Net** is a medical image segmentation model for **colonoscopy polyp segmentation**. It is designed to handle large scale variation and weak polyp–background boundaries.
-
-The default architecture is:
-
-- **Dual encoder**: Res2Net-50 extracts local multi-scale texture; Vision Mamba models long-range context with selective scan.
-- **Adaptive fusion**: multi-level Res2Net and Mamba features are aligned and fused into five scales (`x0`–`x4`).
-- **Innovative decoder** (default): query-guided aggregation, three-level boundary–region contrastive learning, 4-stage progressive refinement, and dual-stream boundary prediction.
-
-Training uses a combination of BCE, Dice, boundary, and contrastive losses. Testing supports five public polyp datasets and optional test-time augmentation (TTA).
-
-This repository provides training, testing, resume, and TTA scripts so that experiments can be reproduced from data preparation to evaluation.
+- [1. Method Overview](#1-method-overview)
+- [2. Datasets & Download Links](#2-datasets--download-links)
+- [3. Code Structure](#3-code-structure)
+- [4. Environment Requirements](#4-environment-requirements)
+- [5. Model Weights & Releases](#5-model-weights--releases)
+- [6. Training & Evaluation Workflow](#6-training--evaluation-workflow)
+- [7. Citations](#7-citations)
+- [8. License](#8-license)
 
 ---
 
-## 2. Dataset & Code Information
+## 1. Method Overview
 
-### 2.1 Datasets
+**BRAD-Net** is designed for robust polyp segmentation under challenging conditions such as severe scale variations, diverse morphological patterns, and low polyp–background contrast.
 
-Experiments follow the common polyp-segmentation protocol. Training uses a combined set with **images**, **masks**, and **edge maps**. Testing uses five public benchmarks:
+### Key Architectural Highlights
+* **Dual Encoder**: Combines Res2Net-50 (for local multi-scale edge and texture feature extraction) and Vision Mamba (for linear-complexity long-range contextual dependencies).
+* **Adaptive Multi-Level Feature Fusion**: Dynamically aligns and fuses multi-scale feature hierarchies into unified representation stages (`x0`–`x4`).
+* **Boundary–Region Contrastive Decoupling Decoder**: Employs query-guided feature aggregation, multi-level boundary-region contrastive supervision, progressive 4-stage refinement, and dual-stream boundary prediction.
 
-| Split | Dataset | Role |
-|-------|---------|------|
-| Train | Combined train set (from Kvasir / CVC-ClinicDB protocol) | Supervise region and boundary |
-| Test | **CVC-300** | Seen-style / in-distribution test |
-| Test | **CVC-ClinicDB** | Clinic colonoscopy frames |
-| Test | **Kvasir** | Large-variation polyps |
-| Test | **CVC-ColonDB** | Unseen / generalization |
-| Test | **ETIS-LaribPolypDB** | Unseen / generalization |
+```text
+Input Image (352 x 352)
+        │
+        ├─────────────────────────────┬─────────────────────────────┐
+        ▼                             ▼                             │
+  Res2Net-50 Backbone           Vision Mamba Branch                 │
+  (Local Multi-Scale)         (Long-Range Context SSM)              │
+        │                             │                             │
+        └──────────────┬──────────────┘                             │
+                       ▼                                            │
+        Adaptive Multi-Level Feature Fusion                         │
+                       │                                            │
+                       ▼                                            │
+        Boundary-Region Decoupling Decoder                          │
+       (Query Aggregation + Contrastive Loss)                       │
+                       │                                            │
+                       ▼                                            │
+        Predicted Polyp Mask & Boundary Map  ◄──────────────────────┘
 
-Place data as follows (paths can be changed via CLI arguments):
+```
+
+---
+
+## 2. Datasets & Download Links
+
+All experiments follow standard benchmarking protocols for polyp segmentation across **four publicly available datasets**:
+
+| Dataset | Official Source / Portal | Role in Benchmark |
+| --- | --- | --- |
+| **Kvasir-SEG** | [Simula Portal](https://datasets.simula.no/kvasir-seg/) | Train / In-distribution Test |
+| **CVC-ClinicDB** | [Grand Challenge](https://polyp.grand-challenge.org/CVCClinicDB/) | Train / In-distribution Test |
+| **CVC-300** | [EndoScene Project](https://endoscopymsa.com/) | Out-of-distribution Test |
+| **ETIS-LaribPolypDB** | [Grand Challenge](https://polyp.grand-challenge.org/EtisLarib/) | Generalization Test (Challenging) |
+
+### Directory Structure
+
+Organize the datasets as follows:
 
 ```text
 TrainDatasetEdges/
-├── images/          # RGB frames (.jpg / .png)
-├── masks/           # binary polyp masks (same stem as images)
-└── edges/           # boundary maps for boundary supervision
+├── images/          # Colonoscopy RGB frames (.png / .jpg)
+├── masks/           # Binary ground-truth polyp masks (.png)
+└── edges/           # Boundary/edge ground truth for boundary loss
 
 TestDataset/
 ├── CVC-300/
 │   ├── images/
 │   └── masks/
 ├── CVC-ClinicDB/
+│   ├── images/
+│   └── masks/
 ├── Kvasir/
-├── CVC-ColonDB/
+│   ├── images/
+│   └── masks/
 └── ETIS-LaribPolypDB/
+    ├── images/
+    └── masks/
+
 ```
 
-Download Res2Net-50 pretrained weights and put them at:
+---
 
-```text
-lib/res2net50_v1b_26w_4s-3cf99910.pth
-```
-
-Typical source: [Res2Net official weights](https://github.com/Res2Net/Res2Net-PretrainedModels).
-
-### 2.2 Code structure
+## 3. Code Structure
 
 ```text
 BRAD-Net/
@@ -78,132 +96,66 @@ BRAD-Net/
 ├── LICENSE
 ├── requirements_optimized.txt
 ├── lib/
-│   ├── BRAD_Net.py                          # Dual encoder + decoder (main model)
-│   ├── res2net_v1b_base.py                  # Res2Net-50 backbone
-│   └── res2net50_v1b_26w_4s-3cf99910.pth    # Pretrained CNN weights (download)
+│   ├── BRAD_Net.py                           # Model definition (Dual encoder + decoder)
+│   ├── res2net_v1b_base.py                   # Res2Net-50 backbone definition
+│   └── res2net50_v1b_26w_4s-3cf99910.pth     # Pretrained backbone weights (downloaded)
 ├── utils/
-│   ├── dataloader.py                        # Train / test loaders and augmentation
-│   ├── trainer.py                           # Learning-rate schedule helpers
-│   └── eva_funcs.py                         # Metrics (e.g. S-measure, MAE)
-├── train_optimized_cfanet.py                # Training entry
-├── test_optimized_cfanet.py                 # Testing / evaluation entry
-├── run_train_autodl.sh                      # Example training script
-├── run_test_innovative.sh                   # Example testing script
-├── resume_training_from_best.sh / .bat      # Resume from best checkpoint
-├── resume_training_fixed.sh                 # Resume after contrastive-loss fix
-├── test_with_tta.sh / .bat                  # Multi-scale + flip TTA
-├── TrainDatasetEdges/                       # Training data (user-provided)
-├── TestDataset/                             # Test data (user-provided)
-├── checkpoint/                              # Saved weights (created at run time)
-└── results/                                 # Prediction maps (created at run time)
+│   ├── dataloader.py                         # Data loaders and augmentations
+│   ├── trainer.py                            # Training optimization routines
+│   └── eva_funcs.py                          # Evaluation metrics (mDice, IoU, MAE, HD95)
+├── train_optimized_cfanet.py                 # Training script
+├── test_optimized_cfanet.py                  # Testing and evaluation script
+├── run_train_autodl.sh                       # Batch training script
+├── run_test_innovative.sh                    # Evaluation pipeline script
+├── checkpoint/                               # Directory for saved checkpoints
+└── results/                                  # Directory for exported segmentation predictions
+
 ```
-
-### 2.3 Model overview
-
-```text
-Input (352 x 352)
-        │
-        ├──────────────┬──────────────┐
-        ▼              ▼              │
-   Res2Net-50    Vision Mamba         │
-   (local CNN)   (long-range SSM)     │
-        │              │              │
-        └──────┬───────┘              │
-               ▼                      │
-   Adaptive Multi-Level Fusion        │
-               │                      │
-               ▼                      │
-   Innovative decoder                 │
-   (query + contrastive + dual-stream)│
-               │                      │
-               ▼                      │
-     Mask + boundary map  ◄───────────┘
-```
-
-Decoder options (`--decoder_type`):
-
-| Value | Description |
-|-------|-------------|
-| `innovative` | **Default.** 3-level contrastive learning, query aggregation, progressive refinement, dual-stream boundary |
-| `ultralight` | Lighter variant (fewer queries / contrastive levels) |
-| `simplified` | Progressive decoder without contrastive learning |
-| `original` | Original CFANet-style decoder (baseline) |
 
 ---
 
-## 3. Requirements
+## 4. Environment Requirements
 
-### 3.1 Environment
+### Hardware & Software
 
-- Python **3.8+**
-- NVIDIA GPU with CUDA (recommended; default resolution is 352×352)
-- PyTorch **1.9+** with a matching `torchvision`
+* **OS**: Linux / Ubuntu 20.04+ (or Windows 10/11)
+* **Python**: >= 3.8
+* **PyTorch**: >= 1.9.0
+* **CUDA**: 11.3+ with compatible NVIDIA GPU (24GB VRAM recommended for batch size 8)
 
-Install dependencies:
-
-```bash
-pip install -r requirements_optimized.txt
-```
-
-### 3.2 Python packages (`requirements_optimized.txt`)
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `torch` | >= 1.9.0 | Deep learning |
-| `torchvision` | >= 0.10.0 | Image transforms |
-| `numpy` | >= 1.21.0 | Arrays |
-| `einops` | >= 0.6.0 | Tensor rearrange for Mamba |
-| `timm` | >= 0.6.0 | Optional ViT weights |
-| `opencv-python` | >= 4.5.0 | Image I/O |
-| `Pillow` | >= 8.3.0 | PIL loading / augmentation |
-| `matplotlib` | >= 3.4.0 | Visualization |
-| `scikit-image` | >= 0.18.0 | Image processing |
-| `tensorboard` | >= 2.7.0 | Training logs |
-| `tqdm` | >= 4.62.0 | Progress bars |
-| `pyyaml` | >= 5.4.0 | Config parsing |
-| `scikit-learn` | >= 1.0.0 | Extra metrics |
-
-Optional: `transformers`, `wandb`.
-
-### 3.3 Hardware notes
-
-- Recommended batch size: **8** on a 24 GB GPU at 352×352 with the innovative decoder.
-- Reduce `--batchsize` or set `--use_amp true` if GPU memory is limited.
-- Mixed precision (`--use_amp`) is off by default for numerical stability of contrastive loss.
-
----
-
-## 4. Usage Instructions / Steps for Implementation
-
-Run all commands from the `BRAD-Net/` directory (the folder that contains `train_optimized_cfanet.py`).
-
-### Step 1. Clone / enter the project
+### Installation
 
 ```bash
+# Clone the repository
+git clone [https://github.com/lyf0323/BRAD-Net.git](https://github.com/lyf0323/BRAD-Net.git)
 cd BRAD-Net
-```
 
-### Step 2. Create a virtual environment and install packages
-
-```bash
+# Create a virtual environment
 python -m venv .venv
-# Linux / macOS
-source .venv/bin/activate
-# Windows
-.venv\Scripts\activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
+# Install required dependencies
 pip install -r requirements_optimized.txt
+
 ```
 
-### Step 3. Prepare data and pretrained weights
+---
 
-1. Organize `TrainDatasetEdges/` and `TestDataset/` as in [Section 2.1](#21-datasets).
-2. Download Res2Net weights into `lib/res2net50_v1b_26w_4s-3cf99910.pth`.
-3. Edit dataset paths in the scripts or pass them on the command line.
+## 5. Model Weights & Releases
 
-### Step 4. Train
+Pretrained backbone weights and trained model checkpoints are hosted on the GitHub Releases portal:
+👉 **[Download Weights from GitHub Releases v1.0.0](https://www.google.com/search?q=https://github.com/lyf0323/BRAD-Net/releases/tag/v1.0.0)**
 
-Recommended configuration (innovative decoder):
+1. Download `res2net50_v1b_26w_4s-3cf99910.pth` and place it in the `lib/` directory.
+2. Download `BRAD-Net_best.pth` and place it in the `checkpoint/innovative_cfanet/` directory for direct evaluation.
+
+---
+
+## 6. Training & Evaluation Workflow
+
+### 6.1 Training
+
+To train BRAD-Net from scratch using the default innovative contrastive-decoupled decoder:
 
 ```bash
 python train_optimized_cfanet.py \
@@ -233,43 +185,19 @@ python train_optimized_cfanet.py \
     --multi_scale true \
     --freeze_resnet false \
     --resnet_lr_scale 0.1
+
 ```
 
-Or run the example script (update AutoDL-style paths first):
+### 6.2 Testing & Benchmark Evaluation
 
-```bash
-bash run_train_autodl.sh
-```
-
-**Loss weights**
-
-| Loss | Default | Role |
-|------|---------|------|
-| BCE | 1.0 | Pixel classification |
-| Dice | 1.0 | Region overlap |
-| Boundary | 0.5 | Edge consistency |
-| Contrastive | 0.2 | Boundary vs. region decoupling |
-
-Best checkpoint is written to:
-
-```text
-checkpoint/innovative_cfanet/OptimizedCFANet_best.pth
-```
-
-TensorBoard:
-
-```bash
-tensorboard --logdir=./checkpoint/innovative_cfanet/logs --port=6006
-```
-
-### Step 5. Test / reproduce evaluation
+To evaluate the trained checkpoint across all 4 benchmarking datasets:
 
 ```bash
 python test_optimized_cfanet.py \
-    --pth_path ./checkpoint/innovative_cfanet/OptimizedCFANet_best.pth \
+    --pth_path ./checkpoint/innovative_cfanet/BRAD-Net_best.pth \
     --test_root ./TestDataset/ \
     --save_root ./results/innovative/ \
-    --datasets "CVC-300,CVC-ClinicDB,Kvasir,CVC-ColonDB,ETIS-LaribPolypDB" \
+    --datasets "CVC-300,CVC-ClinicDB,Kvasir,ETIS-LaribPolypDB" \
     --decoder_type innovative \
     --num_region_queries 100 \
     --num_boundary_queries 25 \
@@ -278,57 +206,28 @@ python test_optimized_cfanet.py \
     --channel 64 \
     --mamba_dim 96 \
     --save_results True
+
 ```
 
-Example script (update `MODEL_PATH` / `TEST_ROOT` first):
-
-```bash
-bash run_test_innovative.sh
-```
-
-Reported metrics typically include **mDice**, **Dice**, **IoU**, **MAE**, Precision, Recall, F1, and optional boundary scores.
-
-### Step 6. Optional: test-time augmentation
-
-TTA uses scales `{0.75, 1.0, 1.25}` and horizontal flip (6 views). It is slower (~6×) and does not require retraining.
-
-```bash
-bash test_with_tta.sh
-# Windows
-test_with_tta.bat
-```
-
-### Step 7. Optional: resume training
-
-```bash
-bash resume_training_from_best.sh
-# Windows
-resume_training_from_best.bat
-```
-
-Set `BEST_MODEL`, `TRAIN_DATA`, and `TEST_DATA` inside the script. Resume uses `--resume path/to/OptimizedCFANet_best.pth`.
-
-### Key hyperparameters
-
-| Argument | Default | Meaning |
-|----------|---------|---------|
-| `--decoder_type` | `innovative` | Decoder variant |
-| `--channel` | 64 | Decoder base channels |
-| `--mamba_dim` | 96 | Mamba embedding size |
-| `--trainsize` / `--testsize` | 352 | Input resolution |
-| `--batchsize` | 16 in parser; 8 in scripts | Mini-batch size |
-| `--lr` | 1e-4 | Learning rate |
-| `--weight_contrastive` | 0.2 | Contrastive loss weight |
-| `--num_region_queries` | 100 | Region queries |
-| `--num_boundary_queries` | 25 | Boundary queries |
+The script will compute standard segmentation metrics, including **Mean Dice (mDice)**, **Mean IoU (mIoU)**, **Mean Absolute Error (MAE)**, and boundary-aware measures.
 
 ---
 
-## 5. Citations
+## 7. Citations
 
-If you use this code or the related methods, please cite the following works.
+If you find this work or code useful in your research, please cite:
 
-**CFANet (boundary-aware polyp segmentation baseline)**
+```bibtex
+@article{bradnet2026,
+  title   = {BRAD-Net: Boundary-Region Adaptive Decoupling Network for Polyp Segmentation},
+  author  = {Guangchao Zhou and Co-authors},
+  journal = {PeerJ Computer Science},
+  year    = {2026}
+}
+
+```
+
+### Acknowledgments & Baselines
 
 ```bibtex
 @article{zhou2023cfanet,
@@ -339,11 +238,7 @@ If you use this code or the related methods, please cite the following works.
   pages   = {109555},
   year    = {2023}
 }
-```
 
-**Res2Net backbone**
-
-```bibtex
 @article{gao2021res2net,
   title   = {Res2Net: A New Multi-scale Backbone Architecture},
   author  = {Gao, Shang-Hua and Cheng, Ming-Ming and Zhao, Kai and Zhang, Xin-Yu and Yang, Ming-Hsuan and Torr, Philip},
@@ -353,79 +248,24 @@ If you use this code or the related methods, please cite the following works.
   pages   = {652--662},
   year    = {2021}
 }
-```
 
-**Mamba / selective state spaces**
-
-```bibtex
 @article{gu2023mamba,
   title   = {Mamba: Linear-Time Sequence Modeling with Selective State Spaces},
   author  = {Gu, Albert and Dao, Tri},
   journal = {arXiv preprint arXiv:2312.00752},
   year    = {2023}
 }
+
 ```
-
-**PraNet (boundary-aware polyp segmentation)**
-
-```bibtex
-@inproceedings{fan2020pranet,
-  title     = {PraNet: Parallel Reverse Attention Network for Polyp Segmentation},
-  author    = {Fan, Deng-Ping and Ji, Ge-Peng and Zhou, Tao and Chen, Geng and Fu, Huazhu and Shen, Jianbing and Shao, Ling},
-  booktitle = {MICCAI},
-  pages     = {263--273},
-  year      = {2020}
-}
-```
-
-**Supervised contrastive learning**
-
-```bibtex
-@inproceedings{khosla2020supcon,
-  title     = {Supervised Contrastive Learning},
-  author    = {Khosla, Prannay and Teterwak, Piotr and Wang, Chen and Sarna, Aaron and Tian, Yonglong and Isola, Phillip and Maschinot, Aaron and Liu, Ce and Krishnan, Dilip},
-  booktitle = {NeurIPS},
-  year      = {2020}
-}
-```
-
-**Query-based decoding (MaskFormer)**
-
-```bibtex
-@inproceedings{cheng2021maskformer,
-  title     = {Per-Pixel Classification is Not All You Need for Semantic Segmentation},
-  author    = {Cheng, Bowen and Schwing, Alexander G. and Kirillov, Alexander},
-  booktitle = {NeurIPS},
-  year      = {2021}
-}
-```
-
-**Datasets**
-
-```bibtex
-@article{bernal2015clinicdb,
-  title   = {WM-DOVA Maps for Accurate Polyp Highlighting in Colonoscopy: Experimental Assessment},
-  author  = {Bernal, Jorge and S{\'a}nchez, F. Javier and Fern{\'a}ndez-Esparrach, Gloria and Gil, Debora and Rodr{\'i}guez, Cristina and Vilari{\~n}o, Fernando},
-  journal = {Computerized Medical Imaging and Graphics},
-  volume  = {48},
-  pages   = {99--111},
-  year    = {2016}
-}
-
-@inproceedings{jha2020kvasir,
-  title     = {Kvasir-SEG: A Segmented Polyp Dataset},
-  author    = {Jha, Debesh and Smedsrud, Pia H. and Riegler, Michael A. and Halvorsen, P{\aa}l and de Lange, Thomas and Johansen, Dag and Johansen, H{\aa}vard D.},
-  booktitle = {MMM},
-  year      = {2020}
-}
-```
-
-Official CFANet code: [https://github.com/taozh2017/CFANet](https://github.com/taozh2017/CFANet).
 
 ---
 
-## 6. License
+## 8. License
 
-This project is released under the **MIT License**. See the [LICENSE](LICENSE) file in this directory.
+This project is licensed under the **MIT License**. See the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
 
-Pretrained weights (Res2Net, optional ViT) and third-party datasets remain under their original licenses. Please follow those terms when redistributing models or data.
+Third-party datasets and pretrained model backbones remain subject to their respective original licenses and terms of use.
+
+```
+
+```
