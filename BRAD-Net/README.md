@@ -1,4 +1,3 @@
-```markdown
 # BRAD-Net: Boundary-Region Adaptive Decoupling Network for Polyp Segmentation
 
 Official implementation of **BRAD-Net** for colonoscopy polyp segmentation in medical image analysis.
